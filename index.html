@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy New Year 2026 - Final 5s</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Arial', sans-serif; user-select: none; }
+        canvas { display: block; }
+        
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; transition: opacity 0.5s; cursor: pointer;
+        }
+        #start-screen h1 { color: #fff; font-size: 40px; text-shadow: 0 0 10px #00eaff; margin-bottom: 20px; text-align: center;}
+        #start-screen p { color: #aaa; font-size: 18px; animation: blink 1s infinite; }
+
+        #countdown-overlay {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 20vw; /* Số 5 to hơn nữa cho kịch tính */
+            color: white; font-weight: bold;
+            text-shadow: 0 0 20px #ff00de, 0 0 40px #00eaff;
+            pointer-events: none; opacity: 0; transition: all 0.2s ease; z-index: 10;
+        }
+        .hidden { opacity: 0 !important; pointer-events: none; }
+        .visible { opacity: 1 !important; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+<audio id="bg-music" src="./nhac.mp3" loop></audio>
+<audio id="boom-sound" src="./boom.mp3" preload="auto"></audio>
+
+<div id="start-screen">
+    <h1>CHÚC MỪNG NĂM MỚI 2026</h1>
+    <p>▼ CHẠM ĐỂ ĐẾM NGƯỢC 5 GIÂY ▼</p>
+</div>
+
+<div id="countdown-overlay">5</div>
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const countdownEl = document.getElementById('countdown-overlay');
+    const startScreen = document.getElementById('start-screen');
+    const bgMusic = document.getElementById('bg-music');
+    const boomSoundBase = document.getElementById('boom-sound');
+
+    let width, height;
+    let particles = [];
+    let fireworks = [];
+    let isGameStarted = false;
+    let isRandomFireworksEnabled = false;
+
+    const TEXT_LIST = ["2026", "TẾT", "AN KHANG", "MAY MẮN", "BÌNH AN", "PHÁT TÀI", "HẠNH PHÚC"];
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- HÀM GIỌNG ĐỌC THÔNG MINH ---
+    // Tự động chuyển giọng Anh/Việt tùy nội dung
+    function speak(text, lang = 'vi-VN') {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = lang; 
+            utterance.rate = 1.1; 
+            utterance.pitch = 1.2; 
+            utterance.volume = 1; 
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    startScreen.addEventListener('click', () => {
+        startScreen.classList.add('hidden');
+        isGameStarted = true;
+        speak(""); 
+        countdownEl.classList.add('visible');
+        startCountdown();
+        loop();
+    });
+
+    function playBoom(vol = 1) {
+        const sound = boomSoundBase.cloneNode();
+        sound.volume = vol; 
+        sound.play().catch(() => {});
+    }
+
+    function randomColor() {
+        const r = Math.floor(Math.random() * 200 + 55);
+        const g = Math.floor(Math.random() * 200 + 55);
+        const b = Math.floor(Math.random() * 200 + 55);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    // --- ĐẾM NGƯỢC TỪ 5 ---
+    let countVal = 5; // Bắt đầu từ 5
+    function startCountdown() {
+        countdownEl.innerText = countVal;
+        speak(countVal.toString(), 'vi-VN'); 
+
+        const timer = setInterval(() => {
+            countVal--;
+            if (countVal > 0) {
+                countdownEl.style.transform = "translate(-50%, -50%) scale(1.3)";
+                setTimeout(() => countdownEl.style.transform = "translate(-50%, -50%) scale(1)", 100);
+                
+                countdownEl.innerText = countVal;
+                speak(countVal.toString(), 'vi-VN'); 
+            } else {
+                clearInterval(timer);
+                countdownEl.classList.remove('visible');
+                countdownEl.classList.add('hidden');
+                
+                // Hô HAPPY NEW YEAR bằng giọng Anh Mỹ (en-US)
+                speak("Happy New Year", 'en-US');
+                
+                bgMusic.volume = 0.3; 
+                bgMusic.play().catch(() => {});
+                
+                startHappyNewYearSequence();
+            }
+        }, 1000);
+    }
+
+    function startHappyNewYearSequence() {
+        launchTextFirework("HAPPY", width * 0.2); 
+        launchTextFirework("NEW", width * 0.5);   
+        launchTextFirework("YEAR", width * 0.8);  
+        setTimeout(() => { isRandomFireworksEnabled = true; }, 3000);
+    }
+
+    function launchTextFirework(text, xPos) {
+        const fw = new Firework();
+        fw.x = xPos;
+        fw.targetY = height * 0.25; 
+        fw.type = "text_specific";
+        fw.specificText = text;
+        fireworks.push(fw);
+    }
+
+    // --- CLASS PHÁO HOA ---
+    class Firework {
+        constructor() {
+            this.x = Math.random() * width;
+            this.y = height;
+            this.targetY = Math.random() * (height * 0.5) + (height * 0.1); 
+            this.speed = Math.random() * 5 + 15; 
+            this.angle = -Math.PI / 2;
+            this.vx = Math.cos(this.angle) * this.speed;
+            this.vy = Math.sin(this.angle) * this.speed;
+            this.color = randomColor();
+            this.exploded = false;
+            this.type = "normal"; 
+            this.specificText = "";
+            if (isRandomFireworksEnabled) {
+                this.type = Math.random() < 0.6 ? "shape" : "normal";
+            }
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy; this.vy += 0.25;
+            if ((this.y <= this.targetY || this.vy >= 0) && !this.exploded) {
+                this.explode();
+            }
+        }
+        draw() {
+            if (!this.exploded) {
+                ctx.beginPath(); ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = this.color; ctx.fill();
+            }
+        }
+        explode() {
+            this.exploded = true;
+            playBoom(Math.random() * 0.4 + 0.6); 
+            if (this.type === "text_specific") {
+                createText(this.specificText, this.x, this.y, this.color);
+            } else if (this.type === "shape") {
+                const rand = Math.random();
+                if (rand < 0.3) createGojo(this.x, this.y);
+                else if (rand < 0.6) createHeart(this.x, this.y, this.color);
+                else {
+                    const text = TEXT_LIST[Math.floor(Math.random() * TEXT_LIST.length)];
+                    createText(text, this.x, this.y, this.color);
+                }
+            } else {
+                createNormalExplosion(this.x, this.y, this.color);
+            }
+        }
+    }
+
+    class Particle {
+        constructor(x, y, vx, vy, color, decay = 0.012) {
+            this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+            this.color = color; this.alpha = 1; this.decay = decay;
+            this.hasSparkle = Math.random() < 0.5; 
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy;
+            this.vx *= 0.96; this.vy *= 0.96; this.vy += 0.06; 
+            this.alpha -= this.decay;
+        }
+        draw() {
+            ctx.save(); 
+            if (this.hasSparkle && Math.random() < 0.2) {
+                ctx.globalAlpha = 1; ctx.fillStyle = "#fff"; 
+            } else {
+                ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color; 
+            }
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.hasSparkle ? 2.5 : 2, 0, Math.PI * 2);
+            ctx.fill(); ctx.restore();
+        }
+    }
+
+    function createGojo(x, y) {
+        const art = [
+            "   WWWWWWW   ", "  WWWWWWWWW  ", " WWWWWWWWWWW ", "WWWWWWWWWWWWW",
+            "BBBBBBBBBBBBB", "BBBBBBBBBBBBB",
+            " OOOOOOOOOOO ", "  OOOOOOOOO  ", "   OOOOOOO   ", "    OOOOO    "
+        ];
+        const scale = 6;
+        for (let r = 0; r < art.length; r++) {
+            for (let c = 0; c < art[r].length; c++) {
+                if (art[r][c] !== ' ') {
+                    let color = art[r][c] === 'B' ? '#2a0e45' : (art[r][c] === 'O' ? '#ffe0bd' : '#fff');
+                    const p = new Particle(x + (c - art[r].length/2)*scale, y + (r - art.length/2)*scale, 0, 0, color, 0.008);
+                    p.vx = (Math.random()-0.5)*0.5; p.vy = (Math.random()-0.5)*0.5;
+                    particles.push(p);
+                }
+            }
+        }
+        createNormalExplosion(x, y, '#9900ff');
+    }
+
+    function createHeart(x, y, color) {
+        const scale = 12; 
+        for (let i = 0; i < Math.PI * 2; i += 0.1) {
+            const hx = 16 * Math.pow(Math.sin(i), 3);
+            const hy = -(13 * Math.cos(i) - 5 * Math.cos(2 * i) - 2 * Math.cos(3 * i) - Math.cos(4 * i));
+            const p = new Particle(x + hx * scale, y + hy * scale, 0, 0, color);
+            p.vx = hx * 0.08; p.vy = hy * 0.08; particles.push(p);
+        }
+    }
+
+    function createText(text, x, y, color) {
+        const offCanvas = document.createElement('canvas');
+        const offCtx = offCanvas.getContext('2d');
+        offCanvas.width = 400; offCanvas.height = 150;
+        offCtx.font = "bold 80px Arial"; offCtx.fillStyle = "white";
+        offCtx.textAlign = "center"; offCtx.textBaseline = "middle";
+        offCtx.fillText(text, 200, 75);
+        const data = offCtx.getImageData(0,0,400,150).data;
+        for(let i=0; i<150; i+=4) { 
+            for(let j=0; j<400; j+=4) {
+                if(data[(i*400+j)*4+3] > 128) {
+                    const p = new Particle(x + (j-200)*1.5, y + (i-75)*1.5, 0, 0, color, 0.015);
+                    p.vx = (Math.random()-0.5)*0.5; p.vy = (Math.random()-0.5)*0.5; particles.push(p);
+                }
+            }
+        }
+    }
+
+    function createNormalExplosion(x, y, color) {
+        for (let i=0; i<150; i++) { 
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 3; 
+            particles.push(new Particle(x, y, Math.cos(angle)*speed, Math.sin(angle)*speed, color));
+        }
+    }
+
+    function loop() {
+        if (!isGameStarted) return;
+        ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; ctx.fillRect(0, 0, width, height);
+        ctx.globalCompositeOperation = 'lighter';
+        if (isRandomFireworksEnabled && Math.random() < 0.04) fireworks.push(new Firework());
+        for (let i = fireworks.length - 1; i >= 0; i--) {
+            fireworks[i].update(); fireworks[i].draw(); if (fireworks[i].exploded) fireworks.splice(i, 1);
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update(); particles[i].draw(); if (particles[i].alpha <= 0) particles.splice(i, 1);
+        }
+        requestAnimationFrame(loop);
+    }
+</script>
+
+</body>
+</html>
